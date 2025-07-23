@@ -6,7 +6,9 @@ import {
   signOut,
   sendPasswordResetEmail,
   sendEmailVerification,
-  updateProfile
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -120,6 +122,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      console.log('SignInWithGoogle: Starting Google authentication...');
+      const { user } = await signInWithPopup(auth, provider);
+      console.log('SignInWithGoogle: Google authentication successful, user:', user.uid);
+      
+      console.log('SignInWithGoogle: Creating/updating user profile...');
+      await createUserProfile(user);
+      console.log('SignInWithGoogle: User profile updated successfully');
+      
+      return user;
+    } catch (error) {
+      console.error('SignInWithGoogle: Error occurred:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      console.log('SignInWithGoogle: Setting loading to false');
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       setError(null);
@@ -187,6 +217,7 @@ export const AuthProvider = ({ children }) => {
     error,
     signUp,
     signIn,
+    signInWithGoogle,
     logout,
     resetPassword,
     resendVerificationEmail,
