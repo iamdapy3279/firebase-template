@@ -1,0 +1,527 @@
+COMPREHENSIVE FIREBASE + REACT TEMPLATE PROMPT
+===============================================
+
+Create a complete, production-ready React + Firebase web application template with authentication, file storage, user management, and deployment configuration. This prompt includes all technical specifications to avoid common pitfalls.
+
+CRITICAL TECHNICAL REQUIREMENTS:
+==============================
+
+1. DEPENDENCIES & VERSIONS (EXACT):
+   - React 19.1.0 with Vite 7.0.4
+   - Firebase 12.0.0
+   - Tailwind CSS 4.1.11 (IMPORTANT: v4, not v3!)
+   - @tailwindcss/postcss 4.1.11
+   - @tailwindcss/forms 0.5.10
+   - React Router DOM 7.7.0
+   - React Hook Form 7.60.0
+   - Lucide React 0.525.0
+
+2. TAILWIND CSS V4 CONFIGURATION (CRITICAL):
+   - Use EMPTY tailwind.config.js: export default {}
+   - Use @import "tailwindcss" in CSS (NOT @tailwind directives)
+   - Define colors with @theme and CSS custom properties
+   - PostCSS config: { '@tailwindcss/postcss': {}, autoprefixer: {} }
+   - NO @apply directives - use native CSS only
+
+3. FIREBASE CONFIGURATION:
+   - Authentication (email/password, email verification)
+   - Firestore database with user profiles
+   - Storage for file uploads (configured but optional)
+   - Hosting configuration for SPA routing
+
+PROJECT STRUCTURE:
+=================
+
+src/
+├── components/
+│   ├── auth/
+│   │   ├── LoginForm.jsx
+│   │   ├── RegisterForm.jsx
+│   │   ├── ForgotPasswordForm.jsx
+│   │   ├── EmailVerification.jsx
+│   │   └── ProtectedRoute.jsx
+│   ├── dashboard/
+│   │   └── Dashboard.jsx
+│   ├── files/
+│   │   ├── FileManager.jsx
+│   │   └── FileUploadZone.jsx
+│   ├── layout/
+│   │   ├── Layout.jsx
+│   │   └── Navbar.jsx
+│   ├── profile/
+│   │   └── ProfileSettings.jsx
+│   └── ui/
+│       ├── ErrorBoundary.jsx
+│       └── LoadingSpinner.jsx
+├── contexts/
+│   ├── AuthContext.jsx
+│   └── ThemeContext.jsx
+├── lib/
+│   └── firebase.js
+├── App.jsx
+├── main.jsx
+└── index.css
+
+DETAILED SPECIFICATIONS:
+=======================
+
+1. TAILWIND CSS V4 SETUP (src/index.css):
+```css
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  --color-primary-950: #172554;
+  
+  --color-secondary-50: #f8fafc;
+  --color-secondary-100: #f1f5f9;
+  --color-secondary-200: #e2e8f0;
+  --color-secondary-300: #cbd5e1;
+  --color-secondary-400: #94a3b8;
+  --color-secondary-500: #64748b;
+  --color-secondary-600: #475569;
+  --color-secondary-700: #334155;
+  --color-secondary-800: #1e293b;
+  --color-secondary-900: #0f172a;
+  --color-secondary-950: #020617;
+  
+  --color-success-50: #f0fdf4;
+  --color-success-600: #16a34a;
+  --color-danger-50: #fef2f2;
+  --color-danger-600: #dc2626;
+  --color-warning-50: #fffbeb;
+  --color-warning-600: #d97706;
+  
+  --font-family-sans: Inter, system-ui, sans-serif;
+}
+
+/* Base styles */
+* {
+  border-color: var(--color-secondary-300);
+}
+
+.dark * {
+  border-color: var(--color-secondary-600);
+}
+
+body {
+  background-color: var(--color-secondary-50);
+  color: var(--color-secondary-900);
+}
+
+.dark body {
+  background-color: var(--color-secondary-900);
+  color: white;
+}
+
+/* Component classes (NO @apply - use native CSS) */
+.btn-primary {
+  background-color: var(--color-primary-600);
+  color: white;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+  outline: none;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-700);
+}
+
+.card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-secondary-200);
+}
+
+.dark .card {
+  background-color: var(--color-secondary-800);
+  border-color: var(--color-secondary-700);
+}
+```
+
+2. AUTHCONTEXT IMPLEMENTATION (CRITICAL - NO useIsMounted):
+```jsx
+import { createContext, useContext, useEffect, useState } from 'react';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
+
+const AuthContext = createContext({});
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const createUserProfile = async (user, additionalData = {}) => {
+    if (!user) return;
+    
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const snapshot = await getDoc(userRef);
+      
+      if (!snapshot.exists()) {
+        const { displayName, email, photoURL } = user;
+        const createdAt = new Date();
+        
+        await setDoc(userRef, {
+          displayName: displayName || additionalData.displayName || '',
+          email,
+          photoURL: photoURL || '',
+          createdAt,
+          lastLoginAt: createdAt,
+          preferences: {
+            theme: 'light',
+            notifications: true,
+          },
+          ...additionalData
+        });
+      } else {
+        await setDoc(userRef, {
+          lastLoginAt: new Date()
+        }, { merge: true });
+      }
+      
+      return userRef;
+    } catch (error) {
+      console.error('Error creating user profile:', error);
+      throw error;
+    }
+  };
+
+  // DO NOT USE useIsMounted hook - it causes infinite loading
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      try {
+        if (user) {
+          await createUserProfile(user);
+        }
+        
+        setUser(user);
+        setLoading(false);
+      } catch (error) {
+        console.error('Auth state change error:', error);
+        setError(error.message);
+        setLoading(false);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const signIn = async (email, password) => {
+    try {
+      setError(null);
+      setLoading(true);
+      
+      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      await createUserProfile(user);
+      
+      return user;
+    } catch (error) {
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signUp = async (email, password, displayName = '') => {
+    try {
+      setError(null);
+      setLoading(true);
+      
+      const { user } = await createUserWithEmailAndPassword(auth, email, password);
+      
+      if (displayName) {
+        await updateProfile(user, { displayName });
+      }
+      
+      await sendEmailVerification(user);
+      await createUserProfile(user, { displayName });
+      
+      return user;
+    } catch (error) {
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setError(null);
+      await signOut(auth);
+    } catch (error) {
+      setError(error.message);
+      throw error;
+    }
+  };
+
+  const value = {
+    user,
+    loading,
+    error,
+    signUp,
+    signIn,
+    logout,
+    clearError: () => setError(null)
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+```
+
+3. FIREBASE CONFIGURATION (lib/firebase.js):
+```jsx
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export default app;
+```
+
+4. APP ROUTING (App.jsx):
+```jsx
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import Layout from './components/layout/Layout';
+import LoginForm from './components/auth/LoginForm';
+import RegisterForm from './components/auth/RegisterForm';
+import Dashboard from './components/dashboard/Dashboard';
+import ProfileSettings from './components/profile/ProfileSettings';
+import ErrorBoundary from './components/ui/ErrorBoundary';
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <Router>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<LoginForm />} />
+              <Route path="/register" element={<RegisterForm />} />
+              
+              {/* Protected Routes */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Dashboard />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <ProfileSettings />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
+  );
+}
+
+export default App;
+```
+
+5. FIREBASE SECURITY RULES:
+
+firestore.rules:
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can only access their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Files are private to the user who uploaded them
+    match /files/{fileId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+  }
+}
+```
+
+storage.rules:
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+6. FIREBASE HOSTING (firebase.json):
+```json
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}
+```
+
+FEATURES TO IMPLEMENT:
+====================
+
+1. **Authentication System:**
+   - Email/password login and registration
+   - Email verification
+   - Password reset functionality
+   - Protected routes with redirect
+   - User profile creation in Firestore
+
+2. **Dashboard:**
+   - Welcome header with user info
+   - File statistics (total files, storage used, monthly uploads)
+   - Recent files list
+   - Quick action cards
+   - Responsive grid layout
+
+3. **Navigation:**
+   - Top navigation bar with logo
+   - User profile dropdown with logout
+   - Dark mode toggle
+   - Mobile responsive menu
+   - Active link highlighting
+
+4. **Profile Management:**
+   - Edit display name and email
+   - Profile photo upload (if storage enabled)
+   - Theme preferences
+   - Account settings
+
+5. **File Management:**
+   - Drag and drop file upload zone
+   - File listing with preview
+   - File download and delete
+   - File type validation and size limits
+
+6. **UI Components:**
+   - Loading spinners
+   - Error boundaries
+   - Form validation with react-hook-form
+   - Toast notifications
+   - Responsive design
+
+7. **Dark Mode:**
+   - System preference detection
+   - Manual toggle
+   - Persistent user preference
+   - Smooth transitions
+
+CRITICAL GOTCHAS TO AVOID:
+=========================
+
+1. **Tailwind CSS v4:** Use @import "tailwindcss" and @theme, NOT @tailwind directives
+2. **PostCSS:** Use '@tailwindcss/postcss' plugin, not 'tailwindcss'
+3. **AuthContext:** NO useIsMounted hook - causes infinite loading
+4. **Component styles:** Use native CSS with CSS custom properties, NOT @apply
+5. **Firebase config:** Use import.meta.env for Vite environment variables
+6. **Router:** Use React Router v7 syntax with element prop
+7. **Forms:** Use react-hook-form for validation and submission
+
+DEPLOYMENT STEPS:
+================
+
+1. Install dependencies: `npm install`
+2. Set up environment variables in .env file
+3. Build production: `npm run build`
+4. Install Firebase CLI: `npm install -g firebase-tools`
+5. Login: `firebase login`
+6. Initialize: `firebase init hosting` (select dist as public directory)
+7. Deploy: `firebase deploy --only hosting`
+
+ENVIRONMENT VARIABLES (.env):
+============================
+```
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+```
+
+This template creates a fully functional, production-ready Firebase + React application with authentication, file management, and deployment configuration. Follow these specifications exactly to avoid common configuration issues.
