@@ -35,10 +35,28 @@ const ProfileSettings = () => {
             website: data.website || '',
             location: data.location || '',
           });
+        } else {
+          // User document doesn't exist, create default data
+          console.log('User document not found, using defaults');
+          profileForm.reset({
+            displayName: user.displayName || '',
+            email: user.email,
+            bio: '',
+            website: '',
+            location: '',
+          });
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
-        setError('Failed to load profile data');
+        setError('Failed to load profile data. Error: ' + error.message);
+        // Still set default values even if Firestore fails
+        profileForm.reset({
+          displayName: user.displayName || '',
+          email: user.email,
+          bio: '',
+          website: '',
+          location: '',
+        });
       } finally {
         setLoading(false);
       }

@@ -29,6 +29,7 @@ const Navbar = () => {
     { name: 'Dashboard', href: '/dashboard', icon: Home, current: location.pathname === '/dashboard' },
     { name: 'Files', href: '/files', icon: FileText, current: location.pathname === '/files' },
     { name: 'Upload', href: '/upload', icon: Upload, current: location.pathname === '/upload' },
+    { name: 'Test', href: '/test', icon: Settings, current: location.pathname === '/test' },
   ];
 
   const handleLogout = async () => {

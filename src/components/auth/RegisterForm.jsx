@@ -23,7 +23,7 @@ const RegisterForm = () => {
     try {
       clearError();
       await signUp(data.email, data.password, data.displayName);
-      navigate('/verify-email');
+      navigate('/dashboard');
     } catch (error) {
       console.error('Registration error:', error);
     }

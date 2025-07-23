@@ -10,7 +10,6 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { useIsMounted } from '../hooks/useIsMounted';
 
 const AuthContext = createContext({});
 
@@ -26,21 +25,26 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const isMountedRef = useIsMounted();
 
   const clearError = () => setError(null);
 
   const createUserProfile = async (user, additionalData = {}) => {
     if (!user) return;
     
-    const userRef = doc(db, 'users', user.uid);
-    const snapshot = await getDoc(userRef);
+    console.log('CreateUserProfile: Starting for user:', user.uid);
     
-    if (!snapshot.exists()) {
-      const { displayName, email, photoURL } = user;
-      const createdAt = new Date();
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      console.log('CreateUserProfile: Got user reference');
       
-      try {
+      const snapshot = await getDoc(userRef);
+      console.log('CreateUserProfile: Got user document, exists:', snapshot.exists());
+      
+      if (!snapshot.exists()) {
+        const { displayName, email, photoURL } = user;
+        const createdAt = new Date();
+        
+        console.log('CreateUserProfile: Creating new user profile...');
         await setDoc(userRef, {
           displayName: displayName || additionalData.displayName || '',
           email,
@@ -53,18 +57,20 @@ export const AuthProvider = ({ children }) => {
           },
           ...additionalData
         });
-      } catch (error) {
-        console.error('Error creating user profile:', error);
-        throw error;
+        console.log('CreateUserProfile: New profile created successfully');
+      } else {
+        console.log('CreateUserProfile: Updating existing profile...');
+        await setDoc(userRef, {
+          lastLoginAt: new Date()
+        }, { merge: true });
+        console.log('CreateUserProfile: Profile updated successfully');
       }
-    } else {
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, {
-        lastLoginAt: new Date()
-      }, { merge: true });
+      
+      return userRef;
+    } catch (error) {
+      console.error('CreateUserProfile: Error occurred:', error);
+      throw error;
     }
-    
-    return userRef;
   };
 
   const signUp = async (email, password, displayName = '') => {
@@ -95,14 +101,21 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setLoading(true);
       
+      console.log('SignIn: Starting authentication...');
       const { user } = await signInWithEmailAndPassword(auth, email, password);
+      console.log('SignIn: Authentication successful, user:', user.uid);
+      
+      console.log('SignIn: Creating/updating user profile...');
       await createUserProfile(user);
+      console.log('SignIn: User profile updated successfully');
       
       return user;
     } catch (error) {
+      console.error('SignIn: Error occurred:', error);
       setError(error.message);
       throw error;
     } finally {
+      console.log('SignIn: Setting loading to false');
       setLoading(false);
     }
   };
@@ -140,28 +153,33 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    console.log('AuthContext: Setting up onAuthStateChanged listener');
+    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('AuthContext: Auth state changed, user:', user ? user.uid : 'null');
+      
       try {
         if (user) {
+          console.log('AuthContext: User found, creating/updating profile...');
           await createUserProfile(user);
+          console.log('AuthContext: Profile update complete');
+        } else {
+          console.log('AuthContext: No user found');
         }
         
-        // Only update state if component is still mounted
-        if (isMountedRef.current) {
-          setUser(user);
-          setLoading(false);
-        }
+        console.log('AuthContext: Updating state...');
+        setUser(user);
+        setLoading(false);
+        console.log('AuthContext: State updated - user:', user ? 'authenticated' : 'not authenticated', 'loading: false');
       } catch (error) {
         console.error('Auth state change error:', error);
-        if (isMountedRef.current) {
-          setError(error.message);
-          setLoading(false);
-        }
+        setError(error.message);
+        setLoading(false);
       }
     });
 
     return unsubscribe;
-  }, [isMountedRef]);
+  }, []);
 
   const value = {
     user,

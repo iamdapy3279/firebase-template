@@ -20,6 +20,8 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       if (!user) return;
+      
+      console.log('Dashboard: Starting to fetch stats for user:', user.uid);
 
       try {
         const filesQuery = query(
@@ -29,6 +31,7 @@ const Dashboard = () => {
         );
 
         const snapshot = await getDocs(filesQuery);
+        console.log('Dashboard: Firestore query successful, found', snapshot.docs.length, 'files');
         const files = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
@@ -41,14 +44,24 @@ const Dashboard = () => {
 
         const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
 
-        setStats({
+        const newStats = {
           totalFiles: files.length,
           totalSize,
           filesThisMonth: filesThisMonth.length,
           recentFiles: files.slice(0, 5)
-        });
+        };
+        console.log('Dashboard: Setting stats:', newStats);
+        setStats(newStats);
       } catch (error) {
         console.error('Error fetching stats:', error);
+        console.log('Setting default stats due to error:', error.message);
+        // Set default values when Firestore isn't available
+        setStats({
+          totalFiles: 0,
+          totalSize: 0,
+          filesThisMonth: 0,
+          recentFiles: []
+        });
       } finally {
         setLoading(false);
       }

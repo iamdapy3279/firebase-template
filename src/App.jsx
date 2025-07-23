@@ -12,6 +12,10 @@ import FileManager from './components/files/FileManager';
 import FileUploadZone from './components/files/FileUploadZone';
 import ProfileSettings from './components/profile/ProfileSettings';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import FirestoreTest from './components/test/FirestoreTest';
+import SimpleTest from './components/test/SimpleTest';
+import AuthDebug from './components/test/AuthDebug';
+import FirebaseDirectTest from './components/test/FirebaseDirectTest';
 
 function App() {
   return (
@@ -26,6 +30,8 @@ function App() {
               <Route path="/register" element={<RegisterForm />} />
               <Route path="/forgot-password" element={<ForgotPasswordForm />} />
               <Route path="/verify-email" element={<EmailVerification />} />
+              <Route path="/debug-direct" element={<AuthDebug />} />
+              <Route path="/firebase-direct" element={<FirebaseDirectTest />} />
               
               {/* Protected Routes */}
               <Route
@@ -74,6 +80,36 @@ function App() {
                   <ProtectedRoute>
                     <Layout>
                       <ProfileSettings />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/test"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <SimpleTest />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/firestore-test"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <FirestoreTest />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/auth-debug"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <AuthDebug />
                     </Layout>
                   </ProtectedRoute>
                 }
